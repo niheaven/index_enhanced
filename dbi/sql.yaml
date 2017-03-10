@@ -1,0 +1,7 @@
+DBSERVER:
+    server: 172.20.11.55
+    type: sqlserver
+    port: 1433
+    user: hffunds
+    password: hffunds
+    useNTLMv2: false
