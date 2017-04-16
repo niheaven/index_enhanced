@@ -19,7 +19,6 @@
 #   main: Main Source File
 
 pacman::p_load(tidyquant, 
-#               replyr, 
                mlr)
 
 # Table Name for main.*
@@ -33,15 +32,32 @@ source("src/backtesting.R", encoding = "UTF-8")
 
 # For DB Connections
 if (!tryCatch(DBI::dbIsValid(db_data$con), error = function(e) FALSE))
-	db_data <- RSQLServer::src_sqlserver("DBSERVER", 
-	                                     file = "dbi/sql.yaml", 
-	                                     database = "CAIHUI")
-
+# db_data <- RSQLServer::src_sqlserver("DBSERVER", 
+#                                      file = "dbi/sql.yaml", 
+#                                      database = "CAIHUI")
+  db_data <- src_mysql(dbname = "CAIHUI", 
+                       user = NULL, 
+                       password = NULL, 
+                       default.file = "dbi/my.cnf")
 if (!tryCatch(DBI::dbIsValid(db_factors$con), error = function(e) FALSE))
 	db_factors <- src_mysql(dbname = "factors", 
 	                        user = NULL, 
 	                        password = NULL, 
-	                        default.file = "dbi/.my.cnf")
+	                        default.file = "dbi/my.cnf")
 tbl_factors <- tbl(db_factors, TABLE.STOCK)
 
 source("test/test.R", encoding = "UTF-8")
+
+perf_data_300 <- make_perf_data(index_symbol = "000300", start_date, end_date)
+perf_data_500 <- make_perf_data(index_symbol = "399905", start_date, end_date)
+
+perf_data_300$Data %>%
+  mutate_at(vars(starts_with("Index")), funs(cumprod(. + 1))) %>%
+  mutate(Excess_Return = (IndexEnhanced / Index) ^ (12 / row_number()) - 1) %>%
+  gather(key = Type, value = Value, -Date, -Excess_Return) %>%
+  ggplot(aes(x = Date, y = Value)) +
+  geom_line(aes(lty = Type)) +
+  scale_x_date(date_labels = "%Y-%m") + 
+  labs(y = "", x = "") + 
+  theme_tq()
+
