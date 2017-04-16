@@ -43,13 +43,16 @@ seq_monthly <- function(start_date, end_date) {
 
 # Backtest for single period
 backtesting0 <- function(index_symbol, end_date) {
-	end_date_1 <- last.day(end_date %m-% months(1))
+	message(paste("Backtesting date:", end_date), appendLF = FALSE)
+	end_date_1 <- last.day(end_date - 31)
 	factors <- get_index_comps(db_data, index_symbol, end_date_1) %>%
 		load_factors(tbl_factors, ., features, end_date_1)
-	train_n_predict(factors, n = 30) %>% 
+	res <- train_n_predict(factors, n = 30) %>% 
 		factors$predict$Symbol[.] %>% 
 		list(Perf = calc_perf_ew(tbl_factors, ., end_date), 
 			 Symbol = .)
+	message(" Done!")
+	res
 }
 
 # Backtest for several period
@@ -65,29 +68,34 @@ backtesting <- function(index_symbol, start_date, end_date) {
 # Calculate index monthly return
 get_index_mreturn <- function(index_symbol, start_date, end_date) {
 	end_Ymd <- format(end_date, "%Y%m%d")
-	start_Ymd <- format(last.day(start_date - 31), "%Y%m%d")
-	dret <- DBI::dbGetQuery(db_data$con, paste0("SELECT TRADEDATE, TCLOSE
-												FROM TQ_QT_INDEX WHERE SECODE = (SELECT SECODE FROM TQ_OA_STCODE 
-												WHERE SYMBOL = '", index_symbol, "' AND SETYPE = '701') 
-												AND TRADEDATE <= '", end_Ymd, "' AND TRADEDATE >= '", 
-												start_Ymd, "' ORDER BY TRADEDATE"))
-	xts(dret$TCLOSE, ymd(dret$TRADEDATE)) %>% 
-		monthlyReturn() %>%
-		"["(-1) %>%
-		"index<-"(., last.day(index(.)))
+	start_Ymd <- format(start_date - 50, "%Y%m%d")
+	left_join(tbl(db_data, "TQ_QT_INDEX"), 
+			  tbl(db_data, "TQ_OA_STCODE"), 
+			  by = c("SECODE", "EXCHANGE")) %>% 
+		filter(SYMBOL == index_symbol, 
+			   between(TRADEDATE, start_Ymd, end_Ymd)) %>% 
+		select(TRADEDATE, TCLOSE) %>% 
+		collect() %>% 
+		mutate(TRADEDATE = ymd(TRADEDATE)) %>%
+		tq_transmute_xy(x = TCLOSE, 
+						mutate_fun = monthlyReturn, 
+						type = "log") %>%
+		slice(-1) %>%
+		mutate(TRADEDATE = last.day(TRADEDATE))
 }
 
 # Collect backtesting performance and index performance
 make_perf_data <- function(index_symbol, start_date, end_date) {
 	bt_perf_n_symbol <- backtesting(index_symbol, start_date, end_date)
-	bt_perf <- bt_perf_n_symbol$Perf %>% 
-		xts(x = t(.), order.by = ymd(names(.))) %>% 
-		"colnames<-"("Index Enhanced")
+	bt_perf <- t(bt_perf_n_symbol$Perf) %>% 
+		as_tibble(preserve_row_names = TRUE) %>%
+		transmute(Date = ymd(row.names), IndexEnhanced = V1)
 	idx_perf <- get_index_mreturn(index_symbol, start_date, end_date) %>% 
-		"colnames<-"("Index")
-	list(Data = merge(idx_perf, bt_perf), 
+		rename(Date = TRADEDATE, Index = monthly.returns)
+	list(Data = full_join(idx_perf, bt_perf, by = "Date"), 
 		 Stock.Lists = bt_perf_n_symbol$Symbol)
 }
+
 # Plot index and porfolio P/L
 bt_plot <- function(perf_data) {
 	last.day(first(index(perf_data$Data)) - 31) %>% 

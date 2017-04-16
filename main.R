@@ -36,7 +36,6 @@ if (!tryCatch(DBI::dbIsValid(db_data$con), error = function(e) FALSE))
 	db_data <- RSQLServer::src_sqlserver("DBSERVER", 
 	                                     file = "dbi/sql.yaml", 
 	                                     database = "CAIHUI")
-con_data <- db_data$con
 
 if (!tryCatch(DBI::dbIsValid(db_factors$con), error = function(e) FALSE))
 	db_factors <- src_mysql(dbname = "factors", 
