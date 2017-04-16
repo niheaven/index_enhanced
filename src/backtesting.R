@@ -97,10 +97,15 @@ make_perf_data <- function(index_symbol, start_date, end_date) {
 }
 
 # Plot index and porfolio P/L
-bt_plot <- function(perf_data) {
-	last.day(first(index(perf_data$Data)) - 31) %>% 
-		xts(t(c(1, 1)), .) %>% 
-		rbind(cumprod(1 + perf_data$Data)) %>% 
-		"colnames<-"(c("Index", "Index Enhanced")) %>%
-		plot()
+perf_plot <- function(perf_data) {
+  p <- perf_data$Data %>%
+    mutate_at(vars(starts_with("Index")), funs(cumprod(. + 1))) %>%
+    mutate(Excess_Return = (IndexEnhanced / Index) ^ (12 / row_number()) - 1) %>%
+    gather(key = Type, value = Value, -Date, -Excess_Return) %>%
+    ggplot(aes(x = Date, y = Value)) +
+    geom_line(aes(lty = Type)) +
+    scale_x_date(date_labels = "%Y-%m") + 
+    labs(y = "", x = "") + 
+    theme_tq()
+  print(p)
 }

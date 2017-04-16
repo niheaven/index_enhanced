@@ -48,16 +48,5 @@ tbl_factors <- tbl(db_factors, TABLE.STOCK)
 
 source("test/test.R", encoding = "UTF-8")
 
-perf_data_300 <- make_perf_data(index_symbol = "000300", start_date, end_date)
-perf_data_500 <- make_perf_data(index_symbol = "399905", start_date, end_date)
-
-perf_data_300$Data %>%
-  mutate_at(vars(starts_with("Index")), funs(cumprod(. + 1))) %>%
-  mutate(Excess_Return = (IndexEnhanced / Index) ^ (12 / row_number()) - 1) %>%
-  gather(key = Type, value = Value, -Date, -Excess_Return) %>%
-  ggplot(aes(x = Date, y = Value)) +
-  geom_line(aes(lty = Type)) +
-  scale_x_date(date_labels = "%Y-%m") + 
-  labs(y = "", x = "") + 
-  theme_tq()
-
+#perf_data_300 <- make_perf_data(index_symbol = "000300", start_date, end_date)
+#perf_data_500 <- make_perf_data(index_symbol = "399905", start_date, end_date)
